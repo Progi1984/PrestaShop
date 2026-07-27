@@ -98,7 +98,7 @@ class ProductControllerCore extends ProductPresentingFrontControllerCore
      */
     public function getCanonicalURL(): string
     {
-        $product = $this->context->smarty->getTemplateVars('product');
+        $product = $this->getTemplateVarProduct();
 
         if (!($product instanceof ProductLazyArray)) {
             return '';
@@ -141,6 +141,7 @@ class ProductControllerCore extends ProductPresentingFrontControllerCore
 
         // Otherwise immediately show 404
         if (!Validate::isLoadedObject($this->product)) {
+            Hook::exec('actionNotFound');
             $this->product = null;
             header('HTTP/1.1 404 Not Found');
             header('Status: 404 Not Found');
@@ -871,7 +872,7 @@ class ProductControllerCore extends ProductPresentingFrontControllerCore
             );
 
             // These two variables are deprecated are kept just for backward compatibility and will be removed in v10
-            $manufacturerImageUrl = $productManufacturer['image']['small']['url'];
+            $manufacturerImageUrl = $productManufacturer['image']['small']['url'] ?? null;
             $productBrandUrl = $productManufacturer['url'];
         }
 
@@ -1024,9 +1025,9 @@ class ProductControllerCore extends ProductPresentingFrontControllerCore
     }
 
     /**
-     * @return Product
+     * @return Product|null
      */
-    public function getProduct(): Product
+    public function getProduct(): ?Product
     {
         return $this->product;
     }
@@ -1454,7 +1455,7 @@ class ProductControllerCore extends ProductPresentingFrontControllerCore
 
         $breadcrumb['links'][] = [
             'title' => $this->product->name,
-            'url' => $this->context->link->getProductLink($this->product, null, null, null, null, null, (int) $this->getIdProductAttributeByRequest()),
+            'url' => $this->getCanonicalURL(),
         ];
 
         return $breadcrumb;
@@ -1477,6 +1478,7 @@ class ProductControllerCore extends ProductPresentingFrontControllerCore
             '@context' => 'https://schema.org',
             '@type' => 'Product',
             'name' => $product['name'],
+            'url' => $this->getCanonicalURL(),
             'description' => preg_replace("/[\r\n]+/", ' ', $product['meta']['description'] ?? ''),
             'category' => $product['category_name'] ?? '',
         ];
@@ -1547,6 +1549,12 @@ class ProductControllerCore extends ProductPresentingFrontControllerCore
                 ],
             ];
 
+            // Add item condition if available
+            if (!empty($product['show_condition']) && !empty($product['condition']['schema_url'])) {
+                $structuredData['product']['offers']['itemCondition'] = $product['condition']['schema_url'];
+            }
+
+            // Add codes if available
             if (!empty($product['reference'])) {
                 $structuredData['product']['offers']['sku'] = $product['reference'];
             }
